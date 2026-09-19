@@ -11,8 +11,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # Repository boundary hard stop
 
 This repository is the `subscription-usage` web UI. The proxy/backend is a
-separate project. If a request appears to require changing the proxy/backend,
-stop before proposing or performing that work and ask the user exactly:
+separate project at <https://github.com/owenqwenstarsky/chatgpt-codex-proxy>.
+Use the GitHub API to read that repository's `main` branch as the source of
+truth for proxy behavior, APIs, and implementation details. If a request
+appears to require changing the proxy/backend, stop before proposing or
+performing that work and ask the user exactly:
 
 > Hey — are you aware this is a separate fucking project?
 
