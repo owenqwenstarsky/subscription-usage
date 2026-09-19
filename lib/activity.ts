@@ -1,4 +1,4 @@
-import { ActivityEvent, ActivitySnapshot, ProxyRequestRecord } from "@/lib/types";
+import type { ActivityEvent, ActivitySnapshot, ProxyRequestRecord } from "@/lib/types";
 
 export interface ActivityState {
   records: Record<string, ProxyRequestRecord>;
@@ -13,6 +13,9 @@ function sortRecords(records: ProxyRequestRecord[]): ProxyRequestRecord[] {
 
 export function activityReducer(state: ActivityState, event: ActivityEvent): ActivityState {
   if (event.type === "snapshot") {
+    if (state.emittedAt && Date.parse(event.snapshot.emittedAt) < Date.parse(state.emittedAt)) {
+      return state;
+    }
     return {
       records: Object.fromEntries(event.snapshot.requests.map((record) => [record.id, record])),
       emittedAt: event.snapshot.emittedAt,
