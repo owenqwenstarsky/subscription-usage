@@ -154,3 +154,67 @@ export interface DeviceLoginResponse {
   login: DeviceLoginRecord;
   fetchedAt: string;
 }
+
+// ---- Proxy request activity + historical log shapes ----
+
+/** Sanitized request lifecycle metadata. Payloads and credentials are never included. */
+export interface ProxyRequestRecord {
+  id: string;
+  startedAt: string;
+  endedAt?: string | null;
+  route: string;
+  model?: string | null;
+  accountId?: string | null;
+  accountLabel?: string | null;
+  phase: "routing" | "upstream" | "streaming" | "finalizing" | "complete";
+  outcome: "active" | "succeeded" | "failed" | "cancelled" | "timed_out";
+  status?: number | null;
+  durationMs?: number | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}
+
+export interface ActivitySnapshot {
+  requests: ProxyRequestRecord[];
+  emittedAt: string;
+}
+
+export interface ActivityUpsertEvent {
+  type: "upsert";
+  record: ProxyRequestRecord;
+  emittedAt: string;
+}
+
+export interface ActivityRemoveEvent {
+  type: "remove";
+  id: string;
+  emittedAt: string;
+}
+
+export interface ActivitySnapshotEvent {
+  type: "snapshot";
+  snapshot: ActivitySnapshot;
+}
+
+export type ActivityEvent =
+  | ActivityUpsertEvent
+  | ActivityRemoveEvent
+  | ActivitySnapshotEvent;
+
+export interface ActivityLogDay {
+  date: string;
+  total: number;
+  failed: number;
+}
+
+export interface ActivityLogDatesResponse {
+  days: ActivityLogDay[];
+  fetchedAt: string;
+}
+
+export interface ActivityLogResponse {
+  date: string;
+  records: ProxyRequestRecord[];
+  nextCursor?: string | null;
+  fetchedAt: string;
+}

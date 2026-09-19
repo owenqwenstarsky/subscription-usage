@@ -14,6 +14,9 @@ import {
   AdminAccountUsage,
   ApiError,
   DeviceLoginRecord,
+  ActivityLogDatesResponse,
+  ActivityLogResponse,
+  ActivitySnapshot,
   ProxyHealth,
   RotationStrategy,
 } from "./types";
@@ -256,4 +259,45 @@ export async function getDeviceLogin(loginId: string): Promise<DeviceLoginRecord
   return proxyFetch<DeviceLoginRecord>(
     `/admin/accounts/device-login/${encodeURIComponent(loginId)}`,
   );
+}
+
+export async function fetchActivitySnapshot(): Promise<ActivitySnapshot> {
+  return proxyFetch<ActivitySnapshot>("/admin/requests/activity");
+}
+
+export async function fetchActivityLogDates(): Promise<ActivityLogDatesResponse> {
+  return proxyFetch<ActivityLogDatesResponse>("/admin/requests/logs/dates");
+}
+
+export async function fetchActivityLogs(query: string): Promise<ActivityLogResponse> {
+  return proxyFetch<ActivityLogResponse>(`/admin/requests/logs?${query}`);
+}
+
+/**
+ * Opens the proxy's protected SSE activity feed. This deliberately returns the
+ * raw response so the Route Handler can pass its body straight to EventSource.
+ */
+export async function fetchActivityStream(signal: AbortSignal): Promise<Response> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/admin/requests/activity/stream`, {
+      headers: { Authorization: `Bearer ${getApiKey()}`, Accept: "text/event-stream" },
+      signal,
+      cache: "no-store",
+    });
+    if (!res.ok || !res.body) {
+      throw new ProxyRequestError(
+        `Proxy activity stream failed -> ${res.status}`,
+        "proxy_request_failed",
+        res.status,
+      );
+    }
+    return res;
+  } catch (err) {
+    if (err instanceof ProxyConfigError || err instanceof ProxyRequestError) throw err;
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new ProxyRequestError(
+      `Proxy activity stream unreachable at ${getBaseUrl()} (${reason})`,
+      "proxy_unreachable",
+    );
+  }
 }

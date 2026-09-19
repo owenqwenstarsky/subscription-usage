@@ -73,6 +73,30 @@ Env vars (`web/.env.local`, server-only — never `NEXT_PUBLIC_`):
 - `PATCH /api/accounts/[id]` (`{label, status}`)
 - `POST /api/device-login/start`, `GET /api/device-login/[loginId]`
 - `GET|PUT /api/rotation`
+- `GET /api/activity` (protected proxy activity snapshot)
+- `GET /api/activity/stream` (server-relayed SSE; proxy key stays server-side)
+- `GET /api/logs/dates`, `GET /api/logs?date=YYYY-MM-DD` (retained request logs)
+
+## Request activity contract
+
+The Activity and Logbook pages require `chatgpt-codex-proxy` to provide the
+following authenticated admin endpoints. Request records must contain redacted
+metadata only: request ID, timestamps, route template, model, account label/ID,
+phase, outcome, HTTP status/duration, and a safe error code/message. Never emit
+request bodies, response bodies, prompts, tokens, or authorization headers.
+
+- `GET /admin/requests/activity` returns `{ requests, emittedAt }`.
+- `GET /admin/requests/activity/stream` is SSE. It sends `snapshot`, `upsert`,
+  and `remove` events with the same record shape; every new connection starts
+  with a snapshot.
+- `GET /admin/requests/logs/dates` returns available UTC days and their total/
+  failure counts.
+- `GET /admin/requests/logs` accepts `date`, `limit`, `cursor`, `q`, `outcome`,
+  `account`, and `model`; it returns `{ date, records, nextCursor, fetchedAt }`.
+
+The proxy should retain active and terminal records for 60 seconds and append
+one finalized redacted JSONL record to `request-YYYY-MM-DD.jsonl` for the UTC
+start day. Retain 30 daily files.
 
 ## Security note
 
