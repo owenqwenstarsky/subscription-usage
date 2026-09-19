@@ -320,7 +320,9 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               )}
             </div>
 
-            <dl className="mt-6 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">
+            <details className="mt-6 border-t border-zinc-800 pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-zinc-400 hover:text-zinc-200">Account details</summary>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-zinc-500">Plan</dt>
                 <dd className="mt-1 text-zinc-200">
@@ -383,15 +385,18 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                     : "unknown"}
                 </dd>
               </div>
-            </dl>
+              </dl>
 
-            {usage.last_error && (
-              <div className="mt-4 rounded-md bg-amber-500/10 p-3 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/30">
-                Last error: {usage.last_error}
-              </div>
-            )}
+              {usage.last_error && (
+                <div className="mt-4 rounded-md bg-amber-500/10 p-3 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/30">
+                  Last error: {usage.last_error}
+                </div>
+              )}
+            </details>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <details className="mt-4 border-t border-zinc-800 pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-zinc-400 hover:text-zinc-200">Account controls</summary>
+              <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => void handleToggle()}
                 disabled={busyToggle || toggleBlocked}
@@ -434,19 +439,20 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                   Delete account
                 </button>
               )}
-            </div>
+              </div>
 
-            <button
+              <button
               onClick={() => setShowJson((v) => !v)}
               className="mt-4 rounded-md px-3 py-1.5 text-xs text-zinc-400 ring-1 ring-zinc-700 hover:text-zinc-200"
             >
               {showJson ? "Hide raw JSON" : "Show raw JSON"}
             </button>
-            {showJson && (
+              {showJson && (
               <pre className="mt-3 max-h-96 overflow-auto rounded-md bg-zinc-950 p-3 text-[11px] leading-relaxed text-zinc-300 ring-1 ring-zinc-800">
                 {JSON.stringify({ meta: account, usage }, null, 2)}
               </pre>
-            )}
+              )}
+            </details>
           </article>
         ) : null}
       </div>

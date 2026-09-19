@@ -1,45 +1,43 @@
 "use client";
 
-import { OverviewCounts } from "@/lib/usage";
 import { formatPercent } from "@/lib/format";
+import { OverviewCounts } from "@/lib/usage";
 import { AccountFilter } from "./FilterBar";
 
-function Stat({
+function SummaryStat({
   label,
   value,
-  accent = "text-zinc-100",
+  hint,
+  tone = "text-zinc-100",
   onClick,
 }: {
   label: string;
   value: string;
-  accent?: string;
+  hint: string;
+  tone?: string;
   onClick?: () => void;
 }) {
-  const inner = (
+  const content = (
     <>
-      <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
         {label}
-      </div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${accent}`}>
+      </span>
+      <span className={`mt-1 block text-2xl font-semibold tracking-[-0.04em] tabular-nums ${tone}`}>
         {value}
-      </div>
+      </span>
+      <span className="mt-0.5 block text-xs text-zinc-500">{hint}</span>
     </>
   );
-  if (!onClick) {
-    return (
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
-        {inner}
-      </div>
-    );
-  }
-  return (
+
+  return onClick ? (
     <button
       onClick={onClick}
-      title={`Filter: ${label}`}
-      className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-left transition-colors hover:border-zinc-600"
+      className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 px-4 py-3 text-left transition hover:border-indigo-300/30 hover:bg-zinc-900"
     >
-      {inner}
+      {content}
     </button>
+  ) : (
+    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 px-4 py-3">{content}</div>
   );
 }
 
@@ -48,59 +46,37 @@ export function OverviewStats({
   onFilter,
 }: {
   counts: OverviewCounts;
-  onFilter?: (f: AccountFilter) => void;
+  onFilter?: (filter: AccountFilter) => void;
 }) {
+  const needsAttention = counts.exhausted + counts.cooldown + counts.errors;
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-9">
-      <Stat label="Accounts" value={String(counts.total)} onClick={onFilter ? () => onFilter("all") : undefined} />
-      <Stat
-        label="Eligible"
+    <section aria-label="Account summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <SummaryStat
+        label="Accounts"
+        value={String(counts.total)}
+        hint="in this workspace"
+        onClick={onFilter ? () => onFilter("all") : undefined}
+      />
+      <SummaryStat
+        label="Ready"
         value={String(counts.eligible)}
-        accent={counts.eligible > 0 ? "text-emerald-300" : "text-zinc-100"}
+        hint="available now"
+        tone={counts.eligible > 0 ? "text-teal-300" : undefined}
         onClick={onFilter ? () => onFilter("eligible") : undefined}
       />
-      <Stat
-        label="Exhausted"
-        value={String(counts.exhausted)}
-        accent={counts.exhausted > 0 ? "text-red-300" : "text-zinc-100"}
-        onClick={onFilter ? () => onFilter("exhausted") : undefined}
+      <SummaryStat
+        label="Attention"
+        value={String(needsAttention)}
+        hint="limits, cooldowns, or errors"
+        tone={needsAttention > 0 ? "text-amber-300" : undefined}
       />
-      <Stat
-        label="Cooldown"
-        value={String(counts.cooldown)}
-        accent={counts.cooldown > 0 ? "text-amber-300" : "text-zinc-100"}
-        onClick={onFilter ? () => onFilter("cooldown") : undefined}
-      />
-      <Stat
-        label="Disabled"
-        value={String(counts.disabled)}
-        onClick={onFilter ? () => onFilter("disabled") : undefined}
-      />
-      <Stat
-        label="Fetch errors"
-        value={String(counts.errors)}
-        accent={counts.errors > 0 ? "text-red-300" : "text-zinc-100"}
-        onClick={onFilter ? () => onFilter("error") : undefined}
-      />
-      <Stat
-        label="Token expired"
-        value={String(counts.tokenExpired)}
-        accent={counts.tokenExpired > 0 ? "text-red-300" : "text-zinc-100"}
-      />
-      <Stat
-        label="Token < 1h"
-        value={String(counts.tokenExpiringSoon)}
-        accent={counts.tokenExpiringSoon > 0 ? "text-amber-300" : "text-zinc-100"}
-      />
-      <Stat
-        label="Max primary"
+      <SummaryStat
+        label="Peak usage"
         value={formatPercent(counts.maxPrimary)}
-        accent={
-          counts.maxPrimary !== null && counts.maxPrimary >= 95
-            ? "text-red-300"
-            : "text-zinc-100"
-        }
+        hint="highest primary window"
+        tone={counts.maxPrimary !== null && counts.maxPrimary >= 95 ? "text-red-300" : undefined}
       />
-    </div>
+    </section>
   );
 }

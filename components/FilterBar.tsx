@@ -12,6 +12,15 @@ export type AccountFilter =
 
 export type SortKey = "primary-desc" | "secondary-desc" | "reset-soonest" | "label";
 
+const FILTERS: { key: AccountFilter; label: string }[] = [
+  { key: "all", label: "All accounts" },
+  { key: "eligible", label: "Ready" },
+  { key: "exhausted", label: "Limit reached" },
+  { key: "cooldown", label: "Cooldown" },
+  { key: "error", label: "Needs attention" },
+  { key: "disabled", label: "Disabled" },
+];
+
 export function FilterBar({
   filter,
   onFilter,
@@ -22,61 +31,49 @@ export function FilterBar({
   counts,
 }: {
   filter: AccountFilter;
-  onFilter: (f: AccountFilter) => void;
+  onFilter: (filter: AccountFilter) => void;
   sort: SortKey;
-  onSort: (s: SortKey) => void;
+  onSort: (sort: SortKey) => void;
   query: string;
-  onQuery: (q: string) => void;
+  onQuery: (query: string) => void;
   counts: Record<AccountFilter, number>;
 }) {
-  const filters: { key: AccountFilter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "eligible", label: "Eligible" },
-    { key: "exhausted", label: "Exhausted" },
-    { key: "cooldown", label: "Cooldown" },
-    { key: "error", label: "Errors" },
-    { key: "disabled", label: "Disabled" },
-  ];
-
   const hasActiveFilter = filter !== "all" || query.trim() !== "";
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => onFilter(f.key)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset ${
-              filter === f.key
-                ? "bg-zinc-100 text-zinc-900 ring-zinc-100"
-                : "bg-transparent text-zinc-400 ring-zinc-700 hover:text-zinc-200 hover:ring-zinc-600"
-            }`}
-          >
-            {f.label}{" "}
-            <span className={filter === f.key ? "text-zinc-600" : "text-zinc-600"}>
-              {counts[f.key]}
-            </span>
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
+    <section aria-label="Find accounts" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <input
           value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search label, email, id, plan…"
-          className="w-56 rounded-md bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 ring-1 ring-zinc-800 placeholder:text-zinc-600 focus:outline-none focus:ring-zinc-600"
+          onChange={(event) => onQuery(event.target.value)}
+          placeholder="Search accounts"
+          aria-label="Search accounts"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950/70 px-3.5 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-indigo-300/50 focus:ring-2 focus:ring-indigo-400/10"
         />
         <select
+          value={filter}
+          onChange={(event) => onFilter(event.target.value as AccountFilter)}
+          className="rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-sm text-zinc-300 outline-none transition focus:border-indigo-300/50 focus:ring-2 focus:ring-indigo-400/10"
+          aria-label="Filter accounts"
+        >
+          {FILTERS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label} ({counts[option.key]})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <select
           value={sort}
-          onChange={(e) => onSort(e.target.value as SortKey)}
-          className="rounded-md bg-zinc-950 px-2 py-1.5 text-sm text-zinc-200 ring-1 ring-zinc-800 focus:outline-none focus:ring-zinc-600"
+          onChange={(event) => onSort(event.target.value as SortKey)}
+          className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-sm text-zinc-300 outline-none transition focus:border-indigo-300/50 focus:ring-2 focus:ring-indigo-400/10 sm:flex-none"
           aria-label="Sort accounts"
         >
-          <option value="primary-desc">Primary % ↓</option>
-          <option value="secondary-desc">Secondary % ↓</option>
+          <option value="primary-desc">Usage: high to low</option>
+          <option value="secondary-desc">Secondary: high to low</option>
           <option value="reset-soonest">Reset soonest</option>
-          <option value="label">Label A–Z</option>
+          <option value="label">Name: A to Z</option>
         </select>
         {hasActiveFilter && (
           <button
@@ -84,23 +81,19 @@ export function FilterBar({
               onFilter("all");
               onQuery("");
             }}
-            className="rounded-md px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+            className="rounded-lg px-2 py-2 text-xs font-medium text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-200"
           >
             Clear
           </button>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
 export function FilterCount({ visible, total }: { visible: number; total: number }) {
   if (visible === total) return null;
-  return (
-    <div className="text-xs text-zinc-500">
-      Showing {visible} of {total} accounts
-    </div>
-  );
+  return <p className="text-xs text-zinc-500">{visible} of {total} accounts shown</p>;
 }
 
 export function RotationControl({
@@ -110,36 +103,27 @@ export function RotationControl({
   error,
 }: {
   rotation: RotationStrategy | null;
-  onChange: (s: RotationStrategy) => void;
+  onChange: (strategy: RotationStrategy) => void;
   busy: boolean;
   error?: string | null;
 }) {
-  const options: RotationStrategy[] = [
-    "least_used",
-    "round_robin",
-    "sticky",
-    "sticky-thread",
-  ];
-  // Enabled with a last-known/default value even when health fails, so a
-  // failed health poll never blocks rotation changes.
+  const options: RotationStrategy[] = ["least_used", "round_robin", "sticky", "sticky-thread"];
   const effective = rotation ?? "least_used";
+
   return (
-    <label className="flex items-center gap-2 text-xs text-zinc-400">
-      Rotation
+    <label className="flex items-center justify-between gap-4 text-sm text-zinc-400">
+      <span>Rotation</span>
       <select
         value={effective}
-        onChange={(e) => onChange(e.target.value as RotationStrategy)}
+        onChange={(event) => onChange(event.target.value as RotationStrategy)}
         disabled={busy}
-        className="rounded-md bg-zinc-950 px-2 py-1.5 text-xs text-zinc-200 ring-1 ring-zinc-800 focus:outline-none focus:ring-zinc-600 disabled:opacity-50"
+        className="rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-indigo-300/50 disabled:opacity-50"
         title={error ? `Last rotation change failed: ${error}` : undefined}
       >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
         ))}
       </select>
-      {busy && <span className="text-zinc-600">saving…</span>}
     </label>
   );
 }

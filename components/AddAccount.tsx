@@ -89,18 +89,21 @@ export function AddAccount({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Add account"
     >
       <div
-        className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6"
+        className="w-full max-w-md rounded-2xl border border-zinc-700/90 bg-zinc-900 p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-base font-semibold text-zinc-100">Add account</h2>
+          <div>
+            <h2 className="text-lg font-semibold tracking-[-0.025em] text-zinc-100">Add account</h2>
+            <p className="mt-1 text-sm text-zinc-500">Connect with a device code.</p>
+          </div>
           <button
             onClick={onClose}
             className="rounded px-2 py-0.5 text-zinc-400 hover:text-zinc-200"
@@ -112,10 +115,6 @@ export function AddAccount({
 
         {!loginId ? (
           <div className="mt-4">
-            <p className="text-sm text-zinc-400">
-              Starts a device login on the proxy. You’ll open an auth URL,
-              enter a code, and this page picks up the new account automatically.
-            </p>
             {startError && (
               <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
                 {startError}
@@ -124,7 +123,7 @@ export function AddAccount({
             <button
               onClick={() => void handleStart()}
               disabled={starting}
-              className="mt-4 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
+              className="mt-4 rounded-xl bg-teal-300 px-4 py-2 text-sm font-semibold text-teal-950 transition hover:bg-teal-200 disabled:opacity-50"
             >
               {starting ? "Starting…" : "Start device login"}
             </button>
@@ -134,7 +133,7 @@ export function AddAccount({
             {login.status === "pending" && (
               <>
                 <p className="text-sm text-zinc-400">
-                  Open this URL and enter the code:
+                  Open the link, then enter this code.
                 </p>
                 <a
                   href={login.auth_url}

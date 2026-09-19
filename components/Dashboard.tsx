@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { AccountCard } from "@/components/AccountCard";
@@ -25,7 +25,6 @@ import { accountDisplayName, formatAgo } from "@/lib/format";
 import {
   HealthResponse,
   RotationStrategy,
-  UsageAllItem,
   UsageAllResponse,
 } from "@/lib/types";
 import {
@@ -168,31 +167,6 @@ export function Dashboard() {
   const fetchedAt = usageData?.fetchedAt ?? null;
   const failures = usageData?.failures ?? 0;
   const proxyDown = health ? !health.proxyReachable : false;
-
-  // ---- Patch helpers: per-card mutations update one item, no full refetch
-  const patchItem = useCallback(
-    (id: string, patch: (item: UsageAllItem) => UsageAllItem) => {
-      void mutateUsage(
-        (data) =>
-          data
-            ? { ...data, items: data.items.map((i) => (i.account.id === id ? patch(i) : i)) }
-            : data,
-        { revalidate: false },
-      );
-    },
-    [mutateUsage],
-  );
-
-  const removeItem = useCallback(
-    (id: string) => {
-      void mutateUsage(
-        (data) =>
-          data ? { ...data, items: data.items.filter((i) => i.account.id !== id) } : data,
-        { revalidate: false },
-      );
-    },
-    [mutateUsage],
-  );
 
   // ---- Live refresh all (cancellable; per-account failures stay on cards)
   async function handleLiveRefreshAll() {
@@ -394,96 +368,41 @@ export function Dashboard() {
           : "Loading…";
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-      <header className="flex flex-col gap-4 border-b border-zinc-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className={`inline-block size-2.5 rounded-full ${dot}`} title={dotTitle} />
-            <h1 className="text-xl font-semibold text-zinc-100">
-              Codex subscription usage
-            </h1>
-            {usageValidating && usageData && (
-              <span className="text-xs text-zinc-500">Updating…</span>
-            )}
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-9">
+      <header className="rounded-2xl border border-zinc-800/90 bg-zinc-900/45 px-5 py-5 shadow-[0_24px_70px_-48px_rgba(0,0,0,.95)] sm:px-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className={`inline-block size-2 rounded-full ring-4 ring-zinc-950/40 ${dot}`} title={dotTitle} />
+              <h1 className="text-xl font-semibold tracking-[-0.035em] text-zinc-100 sm:text-2xl">Usage</h1>
+              {usageValidating && usageData && <span className="text-xs text-zinc-500">Updating</span>}
+            </div>
+            <p className="mt-1.5 text-sm text-zinc-500">
+              {fetchedAt ? `${usageData?.mode === "live" ? "Live" : "Cached"} ${formatAgo(fetchedAt, now)}` : "Connecting to usage data"}
+            </p>
           </div>
-          <p className="mt-1 text-sm text-zinc-500">
-            {health?.proxyHost ? (
-              <>Proxy <span className="font-mono">{health.proxyHost}</span></>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => void handleCachedRefresh()} className="rounded-xl border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800">Refresh</button>
+            {liveRefreshing ? (
+              <button onClick={cancelLiveRefresh} className="rounded-xl bg-amber-300 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-200">Cancel live update</button>
             ) : (
-              "Proxy usage dashboard"
-            )}{" "}
-            · no login · data via proxy admin API
-            {fetchedAt && (
-              <>
-                {" "}·{" "}
-                <span className="text-zinc-400">
-                  {usageData?.mode === "live" ? "live" : "cached"}{" "}
-                  {formatAgo(fetchedAt, now)}
-                </span>
-              </>
+              <button onClick={() => void handleLiveRefreshAll()} className="rounded-xl bg-indigo-200 px-3.5 py-2 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-100">Live update</button>
             )}
-          </p>
+            <button onClick={() => setShowAdd(true)} className="rounded-xl bg-teal-300 px-3.5 py-2 text-sm font-semibold text-teal-950 transition hover:bg-teal-200">Add account</button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <RotationControl
-            rotation={rotation}
-            onChange={(s) => void handleRotationChange(s)}
-            busy={rotationBusy}
-            error={rotationError}
-          />
-          <label className="flex items-center gap-2 text-xs text-zinc-400">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="accent-zinc-100"
-            />
-            Auto (cached)
-          </label>
-          <select
-            value={pollMs}
-            onChange={(e) => setPollMs(Number(e.target.value))}
-            disabled={!autoRefresh}
-            className="rounded-md bg-zinc-950 px-2 py-1.5 text-xs text-zinc-200 ring-1 ring-zinc-800 focus:outline-none focus:ring-zinc-600 disabled:opacity-50"
-            aria-label="Auto-refresh interval"
-          >
-            {POLL_OPTIONS.map((ms) => (
-              <option key={ms} value={ms}>
-                {ms >= 60_000 ? `${ms / 60_000}m` : `${ms / 1000}s`}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => void handleCachedRefresh()}
-            className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-50"
-          >
-            Refresh cached
-          </button>
-          {liveRefreshing ? (
-            <button
-              onClick={cancelLiveRefresh}
-              className="rounded-md bg-amber-200 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-amber-100"
-              title="Cancel the in-flight live refresh"
-            >
-              Cancel live
-            </button>
-          ) : (
-            <button
-              onClick={() => void handleLiveRefreshAll()}
-              className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
-              title="Fetch fresh quota from upstream for every account (slow)"
-            >
-              Refresh live
-            </button>
-          )}
-          <button
-            onClick={() => setShowAdd(true)}
-            className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white"
-            title="Add an account via device login"
-          >
-            Add account
-          </button>
-        </div>
+        <details className="mt-5 border-t border-zinc-800/90 pt-4">
+          <summary className="w-fit cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">Advanced refresh settings</summary>
+          <div className="mt-3 flex flex-col gap-3 rounded-xl bg-zinc-950/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <RotationControl rotation={rotation} onChange={(strategy) => void handleRotationChange(strategy)} busy={rotationBusy} error={rotationError} />
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} className="accent-indigo-300" />Auto-refresh</label>
+              <select value={pollMs} onChange={(event) => setPollMs(Number(event.target.value))} disabled={!autoRefresh} className="rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none disabled:opacity-50" aria-label="Auto-refresh interval">
+                {POLL_OPTIONS.map((ms) => <option key={ms} value={ms}>{ms >= 60_000 ? `${ms / 60_000}m` : `${ms / 1000}s`}</option>)}
+              </select>
+            </div>
+          </div>
+        </details>
       </header>
 
       {rotationError && (
@@ -498,11 +417,7 @@ export function Dashboard() {
             title="Proxy unreachable"
             message={health?.error ?? "Could not reach the proxy."}
             details={health?.code ? `code: ${health.code}` : null}
-            hint={
-              items.length > 0
-                ? "Showing last known data below. Check PROXY_BASE_URL and PROXY_API_KEY in web/.env.local."
-                : "Is the proxy running? Check PROXY_BASE_URL and PROXY_API_KEY in web/.env.local."
-            }
+            hint={items.length > 0 ? "Last saved account data may still be available." : "Try again when the service is available."}
           />
         )}
         {liveError && (
@@ -510,7 +425,7 @@ export function Dashboard() {
             title="Live refresh failed"
             message={liveError}
             details={liveDetails}
-            hint="Cached data is still shown below. Individual per-account failures appear on each card."
+            hint="Your existing account data is still shown."
             onRetry={() => void handleLiveRefreshAll()}
             onDismiss={() => {
               setLiveError(null);
@@ -523,14 +438,13 @@ export function Dashboard() {
             title="Refresh failed"
             message={usageErrorMessage}
             details={errorDetails(usageError)}
-            hint="Is the proxy running? Check PROXY_BASE_URL and PROXY_API_KEY in web/.env.local."
+            hint="Try again in a moment."
             onRetry={() => void handleCachedRefresh()}
           />
         )}
         {failures > 0 && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-            Live refresh: {failures} of {items.length} account{items.length === 1 ? "" : "s"} failed.
-            Cached values are shown for those cards.
+            {failures} account{failures === 1 ? "" : "s"} could not be updated. Saved values are shown.
           </div>
         )}
 
@@ -563,13 +477,7 @@ export function Dashboard() {
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {visible.map((item) => (
-                    <AccountCard
-                      key={item.account.id}
-                      item={item}
-                      onPatchItem={patchItem}
-                      onRemoveItem={removeItem}
-                      onRefetch={() => void mutateUsage()}
-                    />
+                    <AccountCard key={item.account.id} item={item} />
                   ))}
                 </div>
               )}

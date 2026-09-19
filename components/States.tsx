@@ -61,33 +61,17 @@ export function ErrorBanner({
 
 export function EmptyState({ onAddAccount }: { onAddAccount?: () => void }) {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-700 bg-zinc-900/40 p-8 text-center">
-      <div className="text-lg font-medium text-zinc-200">No accounts yet</div>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-zinc-400">
-        The proxy has no Codex accounts. Add one with the device-login flow:
-      </p>
+    <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/40 p-8 text-center shadow-[0_20px_50px_-42px_rgba(0,0,0,.9)]">
+      <div className="text-lg font-semibold tracking-[-0.02em] text-zinc-100">No accounts yet</div>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-zinc-500">Add an account to start tracking usage.</p>
       {onAddAccount && (
         <button
           onClick={onAddAccount}
-          className="mt-4 rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white"
+          className="mt-5 rounded-xl bg-teal-300 px-4 py-2 text-sm font-semibold text-teal-950 transition hover:bg-teal-200"
         >
           Add account
         </button>
       )}
-      <details className="mx-auto mt-4 max-w-xl text-left">
-        <summary className="cursor-pointer text-center text-xs text-zinc-500 hover:text-zinc-300">
-          CLI alternative
-        </summary>
-        <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 p-3 text-xs text-zinc-300 ring-1 ring-zinc-800">
-{`curl -sS -X POST "$PROXY_URL/admin/accounts/device-login/start" \\
-  -H "Authorization: Bearer $PROXY_API_KEY"`}
-        </pre>
-        <p className="mt-3 text-center text-xs text-zinc-500">
-          Open the returned <span className="font-mono">auth_url</span>, then poll{" "}
-          <span className="font-mono">/admin/accounts/device-login/&lt;login_id&gt;</span>{" "}
-          until status is <span className="font-mono">ready</span>.
-        </p>
-      </details>
     </div>
   );
 }

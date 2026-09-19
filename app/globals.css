@@ -2,8 +2,8 @@
 
 :root {
   color-scheme: dark;
-  --background: #0c0e12;
-  --foreground: #eef0f4;
+  --background: #090b10;
+  --foreground: #f2f4f8;
 }
 
 @theme inline {
@@ -11,25 +11,28 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --color-zinc-950: #0c0e12;
-  --color-zinc-900: #15181e;
-  --color-zinc-800: #292e38;
-  --color-zinc-700: #3b4350;
-  --color-zinc-600: #818a99;
-  --color-zinc-500: #939caa;
+  --color-zinc-950: #090b10;
+  --color-zinc-900: #12151c;
+  --color-zinc-800: #242a35;
+  --color-zinc-700: #384151;
+  --color-zinc-600: #778295;
+  --color-zinc-500: #9aa4b4;
 }
 
 @layer base {
-  body { background: var(--background); color: var(--foreground); font-family: var(--font-geist-sans), sans-serif; }
+  body { background: radial-gradient(circle at 50% -25%, #1c264033 0, transparent 35rem), var(--background); color: var(--foreground); font-family: var(--font-geist-sans), sans-serif; }
   button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
   button, select, summary { cursor: pointer; }
   button, input:not([type="checkbox"]), select { min-height: 40px; }
   button:disabled, select:disabled { cursor: not-allowed; }
-  :focus-visible { outline: 2px solid #a5b4fc; outline-offset: 4px; }
+  :focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
   input, select { max-width: 100%; }
   input[type="checkbox"] { accent-color: #a5b4fc; width: 16px; height: 16px; }
   pre { max-width: 100%; }
-  ::selection { background: #6366f155; }
+  ::selection { background: #818cf855; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+"; display: inline-block; margin-right: 8px; color: #a5b4fc; font-size: 14px; }
+  details[open] > summary::before { content: "–"; }
 }
 
 @layer components {
