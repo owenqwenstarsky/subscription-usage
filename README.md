@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Codex subscription usage viewer
 
-## Getting Started
+Next.js dashboard for viewing usage/quota across all Codex accounts on a
+local [chatgpt-codex-proxy](../chatgpt-codex-proxy/) instance.
 
-First, run the development server:
+No login. The proxy API key lives only in server-side env vars and is never
+sent to the browser.
+
+## Setup
+
+1. Start the proxy (from `../chatgpt-codex-proxy/`):
+
+   ```bash
+   cp .env.example .env   # set PROXY_API_KEY
+   docker compose up -d --build
+   # or: go run ./cmd/api
+   ```
+
+2. Configure this app:
+
+   ```bash
+   cp .env.example .env.local   # set PROXY_API_KEY to the SAME value as the proxy
+   npm install
+   npm run dev
+   ```
+
+3. Open http://localhost:3000
+
+Env vars (`web/.env.local`, server-only — never `NEXT_PUBLIC_`):
+
+| Var              | Default                 | Meaning                                  |
+| ---------------- | ----------------------- | ---------------------------------------- |
+| `PROXY_BASE_URL` | `http://localhost:8080` | Base URL of the running proxy            |
+| `PROXY_API_KEY`  | (required)              | Same key as the proxy's `PROXY_API_KEY`  |
+
+## Cached vs live
+
+- **Cached** (default, auto-poll): reads the proxy's stored quota snapshots.
+  Fast, never hits upstream.
+- **Live** (manual button): the server fans out to
+  `GET /admin/accounts/:id/usage` for every account, which fetches fresh
+  quota from `chatgpt.com`. Slow (seconds), can partially fail — per-account
+  errors stay on each card and cached data remains visible.
+
+## Features
+
+- Live dashboard: cached auto-poll (15s–5m, focus revalidate, updating
+  indicator), manual live refresh with cancel, one-shot refetch when the
+  nearest cooldown/reset expires
+- Overview counts (clickable: eligible / exhausted / cooldown / disabled /
+  errors) + token expired / expiring + max primary
+- Per-account primary (~5h), secondary (~weekly), and code-review (~daily) bars
+  with reset countdowns
+- Credits, OAuth expiry, cooldown, last error, quota source/fetched-at
+- Per-card live refresh (patches the card, no full refetch), token refresh,
+  optimistic enable/disable + label edit with rollback, delete with confirm
+- Add account via device-login flow (auth URL + user code + status polling)
+- Rotation strategy switcher (optimistic, works even when health fails)
+- Filter / search / sort synced to the URL (`?filter&sort&q`), detail page
+  with label edit, enable/disable, delete, raw JSON
+- `?mode=` is strict: `cached|live`, anything else is a 400
+
+## API routes (all server-side, proxy key never leaves the server)
+
+- `GET /api/health` (always 200; failures via `proxyReachable:false`)
+- `GET /api/accounts`
+- `GET /api/accounts/[id]` (metadata for the detail header)
+- `DELETE /api/accounts/[id]`
+- `GET /api/accounts/usage-all?mode=cached|live`
+- `GET /api/accounts/[id]/usage?mode=cached|live`
+- `POST /api/accounts/[id]/refresh-usage`
+- `POST /api/accounts/[id]/refresh-token`
+- `PATCH /api/accounts/[id]` (`{label, status}`)
+- `POST /api/device-login/start`, `GET /api/device-login/[loginId]`
+- `GET|PUT /api/rotation`
+
+## Security note
+
+This site intentionally has no auth. Run it on localhost or a trusted
+network only — anyone with access can trigger live upstream refreshes and
+enable/disable accounts. Do not expose it publicly.
+
+## Verify
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx tsc --noEmit
+npm run lint
+npm run build
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
