@@ -1,5 +1,6 @@
 "use client";
 
+import { ReactNode } from "react";
 import Link from "next/link";
 import { Countdown } from "@/components/Countdown";
 import { EligibilityBadge, LimitBadge, StatusBadge } from "@/components/StatusBadge";
@@ -9,7 +10,15 @@ import { UsageAllItem } from "@/lib/types";
 import { isCoolingDown, isExhausted, quotaOf } from "@/lib/usage";
 import { useNow } from "./Now";
 
-export function AccountCard({ item }: { item: UsageAllItem }) {
+export function AccountCard({
+  item,
+  dragHandle,
+  isDragging = false,
+}: {
+  item: UsageAllItem;
+  dragHandle?: ReactNode;
+  isDragging?: boolean;
+}) {
   const { account } = item;
   const quota = quotaOf(item);
   const now = useNow();
@@ -19,12 +28,17 @@ export function AccountCard({ item }: { item: UsageAllItem }) {
 
   return (
     <article
-      className={`group relative min-w-0 overflow-hidden rounded-2xl border bg-zinc-900/70 p-5 shadow-[0_18px_50px_-36px_rgba(0,0,0,.92)] transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900 ${
+      className={`group relative h-full min-w-0 overflow-hidden rounded-2xl border bg-zinc-900/70 p-5 shadow-[0_18px_50px_-36px_rgba(0,0,0,.92)] transition duration-200 ${
+        isDragging
+          ? "border-indigo-300/60 bg-zinc-900 ring-2 ring-indigo-300/25"
+          : "hover:-translate-y-0.5 hover:bg-zinc-900"
+      } ${
         exhausted ? "border-red-400/30" : "border-zinc-800/90 hover:border-zinc-700"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+        {dragHandle}
+        <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold tracking-[-0.02em] text-zinc-100">
             {accountDisplayName(account)}
           </h2>

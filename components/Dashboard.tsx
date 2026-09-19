@@ -2,8 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
 import useSWR from "swr";
-import { AccountCard } from "@/components/AccountCard";
 import { AddAccount } from "@/components/AddAccount";
 import { useNow } from "@/components/Now";
 import {
@@ -14,7 +28,14 @@ import {
   SortKey,
 } from "@/components/FilterBar";
 import { OverviewStats } from "@/components/OverviewStats";
+import { SortableAccountCard } from "@/components/SortableAccountCard";
 import { CardSkeleton, EmptyState, ErrorBanner } from "@/components/States";
+import {
+  readAccountOrder,
+  reconcileAccountOrder,
+  sameAccountOrder,
+  writeAccountOrder,
+} from "@/lib/account-order";
 import {
   healthKey,
   rotationKey,
@@ -43,7 +64,7 @@ const FILTERS: AccountFilter[] = [
   "error",
   "disabled",
 ];
-const SORTS: SortKey[] = ["primary-desc", "secondary-desc", "reset-soonest", "label"];
+const SORTS: SortKey[] = ["custom", "primary-desc", "secondary-desc", "reset-soonest", "label"];
 const POLL_OPTIONS = [15_000, 30_000, 60_000, 300_000];
 
 function parseFilter(v: string | null): AccountFilter {
@@ -53,7 +74,7 @@ function parseFilter(v: string | null): AccountFilter {
 }
 
 function parseSort(v: string | null): SortKey {
-  return v !== null && SORTS.includes(v as SortKey) ? (v as SortKey) : "primary-desc";
+  return v !== null && SORTS.includes(v as SortKey) ? (v as SortKey) : "custom";
 }
 
 function readLS(key: string): string | null {
@@ -94,6 +115,7 @@ export function Dashboard() {
   );
   const [sort, setSort] = useState<SortKey>(() => parseSort(searchParams.get("sort")));
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [accountOrder, setAccountOrder] = useState<string[]>(readAccountOrder);
   // Poll prefs persist locally (not in URL).
   const [autoRefresh, setAutoRefresh] = useState(
     () => readLS("usage-viewer:auto") !== "off",
@@ -116,7 +138,7 @@ export function Dashboard() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (filter !== "all") params.set("filter", filter);
-    if (sort !== "primary-desc") params.set("sort", sort);
+    if (sort !== "custom") params.set("sort", sort);
     if (query.trim() !== "") params.set("q", query.trim());
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -141,6 +163,15 @@ export function Dashboard() {
     revalidateOnFocus: true,
     dedupingInterval: 5000,
     onSuccess: (data) => {
+      setAccountOrder((current) => {
+        const next = reconcileAccountOrder(
+          current,
+          data.items.map((item) => item.account.id),
+        );
+        if (sameAccountOrder(current, next)) return current;
+        writeAccountOrder(next);
+        return next;
+      });
       // A fresh cached poll supersedes any earlier live-attempt failure.
       if (data.mode === "cached") {
         setLiveError(null);
@@ -164,9 +195,36 @@ export function Dashboard() {
     rotationData?.strategy ?? health?.health?.rotation ?? null;
 
   const items = useMemo(() => usageData?.items ?? [], [usageData]);
+  const accountIds = useMemo(
+    () => items.map((item) => item.account.id),
+    [items],
+  );
+  const effectiveAccountOrder = useMemo(
+    () => reconcileAccountOrder(accountOrder, accountIds),
+    [accountOrder, accountIds],
+  );
   const fetchedAt = usageData?.fetchedAt ?? null;
   const failures = usageData?.failures ?? 0;
   const proxyDown = health ? !health.proxyReachable : false;
+
+  const dragEnabled = sort === "custom" && filter === "all" && query.trim() === "";
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!dragEnabled || !over || active.id === over.id) return;
+
+    const oldIndex = effectiveAccountOrder.indexOf(String(active.id));
+    const newIndex = effectiveAccountOrder.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const next = arrayMove(effectiveAccountOrder, oldIndex, newIndex);
+    setAccountOrder(next);
+    writeAccountOrder(next);
+  }
 
   // ---- Live refresh all (cancellable; per-account failures stay on cards)
   async function handleLiveRefreshAll() {
@@ -322,8 +380,16 @@ export function Dashboard() {
     });
 
     const num = (v: number | null | undefined) => (v === null || v === undefined ? -1 : v);
+    const customPosition = new Map(
+      effectiveAccountOrder.map((accountId, index) => [accountId, index]),
+    );
     return [...filtered].sort((a, b) => {
       switch (sort) {
+        case "custom":
+          return (
+            (customPosition.get(a.account.id) ?? Number.MAX_SAFE_INTEGER) -
+            (customPosition.get(b.account.id) ?? Number.MAX_SAFE_INTEGER)
+          );
         case "secondary-desc":
           return (
             num(quotaOf(b)?.secondary_rate_limit?.used_percent) -
@@ -346,7 +412,7 @@ export function Dashboard() {
           );
       }
     });
-  }, [items, filter, sort, query, now]);
+  }, [items, filter, sort, query, now, effectiveAccountOrder]);
 
   const usageErrorMessage = usageError ? errorMessage(usageError) : null;
   const stale = failures > 0 || items.some((i) => i.error);
@@ -470,16 +536,38 @@ export function Dashboard() {
                 counts={filterCounts}
               />
               <FilterCount visible={visible.length} total={items.length} />
+              {sort === "custom" && (
+                <p className="text-xs text-zinc-500">
+                  {dragEnabled
+                    ? "Drag accounts by the grip to set their fixed order."
+                    : "Clear search and filters to rearrange the custom order."}
+                </p>
+              )}
               {visible.length === 0 ? (
                 <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm text-zinc-500">
                   No accounts match this filter.
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {visible.map((item) => (
-                    <AccountCard key={item.account.id} item={item} />
-                  ))}
-                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={visible.map((item) => item.account.id)}
+                    strategy={rectSortingStrategy}
+                  >
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {visible.map((item) => (
+                        <SortableAccountCard
+                          key={item.account.id}
+                          item={item}
+                          enabled={dragEnabled}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </>
           )

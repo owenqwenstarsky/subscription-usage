@@ -56,8 +56,9 @@ Env vars (`web/.env.local`, server-only — never `NEXT_PUBLIC_`):
   optimistic enable/disable + label edit with rollback, delete with confirm
 - Add account via device-login flow (auth URL + user code + status polling)
 - Rotation strategy switcher (optimistic, works even when health fails)
-- Filter / search / sort synced to the URL (`?filter&sort&q`), detail page
-  with label edit, enable/disable, delete, raw JSON
+- Filter / search / sort synced to the URL (`?filter&sort&q`), browser-local
+  custom account ordering with accessible drag handles, detail page with label
+  edit, enable/disable, delete, raw JSON
 - `?mode=` is strict: `cached|live`, anything else is a 400
 
 ## API routes (all server-side, proxy key never leaves the server)

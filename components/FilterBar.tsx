@@ -10,7 +10,7 @@ export type AccountFilter =
   | "error"
   | "disabled";
 
-export type SortKey = "primary-desc" | "secondary-desc" | "reset-soonest" | "label";
+export type SortKey = "custom" | "primary-desc" | "secondary-desc" | "reset-soonest" | "label";
 
 const FILTERS: { key: AccountFilter; label: string }[] = [
   { key: "all", label: "All accounts" },
@@ -70,6 +70,7 @@ export function FilterBar({
           className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2 text-sm text-zinc-300 outline-none transition focus:border-indigo-300/50 focus:ring-2 focus:ring-indigo-400/10 sm:flex-none"
           aria-label="Sort accounts"
         >
+          <option value="custom">Custom order</option>
           <option value="primary-desc">Usage: high to low</option>
           <option value="secondary-desc">Secondary: high to low</option>
           <option value="reset-soonest">Reset soonest</option>
