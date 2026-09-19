@@ -7,3 +7,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Repository boundary hard stop
+
+This repository is the `subscription-usage` web UI. The proxy/backend is a
+separate project. If a request appears to require changing the proxy/backend,
+stop before proposing or performing that work and ask the user exactly:
+
+> Hey — are you aware this is a separate fucking project?
+
+Continue across that repository boundary only after the user explicitly
+confirms they intend to work on the separate project.
