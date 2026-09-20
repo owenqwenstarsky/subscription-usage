@@ -343,7 +343,7 @@ key without treating the response itself as missing data.
 | `GET /api/activity` | None | Returns the proxy's current activity snapshot with `Cache-Control: no-store`. |
 | `GET /api/activity/stream` | EventSource connection | Relays the authenticated proxy SSE stream with buffering disabled. |
 | `GET /api/logs/dates` | None | Returns retained UTC day summaries with `Cache-Control: no-store`. |
-| `GET /api/logs` | Required `date=YYYY-MM-DD`; optional `limit`, `cursor`, `q`, `outcome`, `account`, `model` | Validates and forwards a log query. `limit` must be 1–100; filter values are limited to 200 characters. |
+| `GET /api/logs` | Required real calendar `date=YYYY-MM-DD`; optional `limit`, `cursor`, `q`, `outcome`, `account`, `model` | Validates and forwards a log query. Impossible dates return `400 invalid_date`; `limit` must be 1–100; filter values are limited to 200 characters. |
 
 Valid log outcomes are `active`, `succeeded`, `failed`, `cancelled`, and
 `timed_out`.
@@ -368,9 +368,17 @@ status. Common mappings are:
 | Missing `PROXY_API_KEY` | 500 | `config_error` |
 | Proxy unreachable or timed out | 502 | `proxy_unreachable` |
 | Proxy rejected the key with 401/403 | 502 | `proxy_auth_failed` |
-| Proxy returned 404 | 404 | `proxy_not_found` |
+| Proxy returned an admin 4xx error | Same 4xx status | Proxy code such as `account_not_found` or `invalid_cursor` |
+| Proxy returned 404 without an admin error body | 404 | `proxy_not_found` |
+| Proxy returned an admin 5xx error | 502 | Proxy code such as `request_logs_failed` |
 | Other proxy failure | 502 | `proxy_request_failed` |
 | Invalid local request input | 400 | Route-specific code such as `invalid_mode`, `invalid_json`, or `invalid_limit` |
+
+For proxy admin errors, the adapter converts the proxy's
+`{ "error": "stable_code", "message": "safe explanation" }` envelope to this
+application's `{ "error": "safe explanation", "code": "stable_code", "proxyStatus": n }`
+shape. This preserves actionable validation and lookup errors without exposing
+the proxy directly to the browser.
 
 ## Data contracts
 

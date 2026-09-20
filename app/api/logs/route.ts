@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchActivityLogs, toApiError } from "@/lib/proxy";
+import { isValidLogDate } from "@/lib/log-query";
 
 export const dynamic = "force-dynamic";
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const OUTCOMES = new Set(["active", "succeeded", "failed", "cancelled", "timed_out"]);
 
 export async function GET(request: NextRequest) {
@@ -16,8 +16,11 @@ export async function GET(request: NextRequest) {
   const cursor = params.get("cursor") ?? "";
   const requestedLimit = Number(params.get("limit") ?? "50");
 
-  if (!DATE.test(date)) {
-    return NextResponse.json({ error: "date must be YYYY-MM-DD.", code: "invalid_date" }, { status: 400 });
+  if (!isValidLogDate(date)) {
+    return NextResponse.json(
+      { error: "date must be a real calendar date in YYYY-MM-DD format.", code: "invalid_date" },
+      { status: 400 },
+    );
   }
   if (outcome && !OUTCOMES.has(outcome)) {
     return NextResponse.json({ error: "Invalid outcome filter.", code: "invalid_outcome" }, { status: 400 });

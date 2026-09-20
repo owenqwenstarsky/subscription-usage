@@ -20,6 +20,7 @@ import {
   ProxyHealth,
   RotationStrategy,
 } from "./types";
+import { mapProxyErrorStatus, readProxyErrorResponse } from "./proxy-errors";
 
 export class ProxyConfigError extends Error {
   constructor(message: string) {
@@ -120,12 +121,19 @@ async function proxyFetch<T>(
         res.status,
       );
     }
-    if (res.status === 404) {
-      throw new ProxyRequestError("Not found on proxy.", "proxy_not_found", 404);
-    }
+    // Admin endpoints use { error: stable_code, message: safe explanation }.
+    // Preserve that contract so callers can distinguish invalid input from an
+    // unavailable proxy instead of receiving a generic gateway error.
+    const { code: upstreamCode, message: upstreamMessage } =
+      await readProxyErrorResponse(res);
+    const fallbackCode = res.status === 404 ? "proxy_not_found" : "proxy_request_failed";
+    const fallbackMessage =
+      res.status === 404
+        ? "Not found on proxy."
+        : `Proxy request failed: ${method} ${path} -> ${res.status}`;
     throw new ProxyRequestError(
-      `Proxy request failed: ${method} ${path} -> ${res.status}`,
-      "proxy_request_failed",
+      upstreamMessage ?? fallbackMessage,
+      upstreamCode ?? fallbackCode,
       res.status,
     );
   }
@@ -142,14 +150,7 @@ export function toApiError(err: unknown): { status: number; body: ApiError } {
     };
   }
   if (err instanceof ProxyRequestError) {
-    const status =
-      err.code === "proxy_unreachable"
-        ? 502
-        : err.code === "proxy_auth_failed"
-          ? 502
-          : err.code === "proxy_not_found"
-            ? 404
-            : 502;
+    const status = mapProxyErrorStatus(err.code, err.proxyStatus);
     return {
       status,
       body: {
