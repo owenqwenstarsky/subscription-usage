@@ -8,16 +8,24 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+# Testing requirement
+
+Always add or update automated tests for every code change. Tests must cover the
+new or changed behavior and relevant failure or edge cases. Run the applicable
+test suite before finishing. If an automated test is genuinely impossible,
+state why and document the manual verification performed instead.
+
 # Repository boundary hard stop
 
 This repository is the `subscription-usage` web UI. The proxy/backend is a
 separate project at <https://github.com/owenqwenstarsky/chatgpt-codex-proxy>.
 Use the GitHub API to read that repository's `main` branch as the source of
-truth for proxy behavior, APIs, and implementation details. If a request
-appears to require changing the proxy/backend, stop before proposing or
-performing that work and ask the user exactly:
+truth for proxy behavior, APIs, and implementation details. This read-only
+inspection does not require confirmation. If a request appears to require
+proposing or performing changes in the proxy/backend repository, stop and ask
+the user exactly:
 
 > Hey — are you aware this is a separate fucking project?
 
-Continue across that repository boundary only after the user explicitly
-confirms they intend to work on the separate project.
+Continue with proxy/backend changes only after the user explicitly confirms they
+intend to work on the separate project.

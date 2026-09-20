@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAccounts, fetchAccountUsage, toApiError } from "@/lib/proxy";
-import { UsageAllItem, UsageAllResponse } from "@/lib/types";
+import { UsageAllResponse } from "@/lib/types";
+import { loadUsageItems } from "@/lib/usage-refresh";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 90;
@@ -18,60 +19,11 @@ export async function GET(request: NextRequest) {
   try {
     const accounts = await fetchAccounts();
 
-    if (mode === "cached" || accounts.length === 0) {
-      const items: UsageAllItem[] = accounts.map((account) => ({
-        account,
-        quota: account.cached_quota ?? null,
-        quotaSource: account.cached_quota?.source ?? "",
-        quotaFetchedAt: account.cached_quota?.fetched_at ?? null,
-      }));
-      const payload: UsageAllResponse = {
-        mode,
-        items,
-        fetchedAt: new Date().toISOString(),
-        failures: 0,
-      };
-      return NextResponse.json(payload);
-    }
-
-    // Live mode: fan out to the proxy; one bad account must not fail the page.
-    const settled = await Promise.allSettled(
-      accounts.map(async (account): Promise<UsageAllItem> => {
-        const usage = await fetchAccountUsage(account.id, false);
-        const quota = usage.quota_runtime ?? usage.cached_quota ?? null;
-        return {
-          account: {
-            ...account,
-            status: usage.status,
-            eligible_now: usage.eligible_now,
-            cooldown_until: usage.cooldown_until ?? null,
-            last_error: usage.last_error ?? "",
-            cached_quota: usage.cached_quota ?? account.cached_quota,
-            oauth_expires: usage.oauth_expires,
-          },
-          quota,
-          quotaSource: usage.quota_source ?? quota?.source ?? "",
-          quotaFetchedAt: usage.quota_fetched_at ?? quota?.fetched_at ?? null,
-        };
-      }),
+    const { items, failures } = await loadUsageItems(
+      accounts,
+      mode === "live",
+      (accountId) => fetchAccountUsage(accountId, false),
     );
-
-    const items: UsageAllItem[] = settled.map((result, index) => {
-      // accounts[index] always exists: same length as settled input.
-      const account = accounts[index]!;
-      if (result.status === "fulfilled") return result.value;
-      const reason =
-        result.reason instanceof Error ? result.reason.message : String(result.reason);
-      return {
-        account,
-        quota: account.cached_quota ?? null,
-        quotaSource: account.cached_quota?.source ?? "",
-        quotaFetchedAt: account.cached_quota?.fetched_at ?? null,
-        error: reason,
-      };
-    });
-
-    const failures = items.filter((item) => item.error).length;
     const payload: UsageAllResponse = {
       mode,
       items,

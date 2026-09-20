@@ -15,7 +15,7 @@ import {
 } from "@/lib/cache-keys";
 import {
   deleteAccountById,
-  liveRefreshAccount,
+  forceUsagePull,
   patchAccountLabel,
   patchAccountStatus,
   tokenRefreshAccount,
@@ -34,7 +34,8 @@ function isNotFound(err: unknown): boolean {
 export function AccountDetail({ accountId }: { accountId: string }) {
   const router = useRouter();
   const now = useNow();
-  const [busyLive, setBusyLive] = useState(false);
+  const [busyRefresh, setBusyRefresh] = useState(false);
+  const [busyPull, setBusyPull] = useState(false);
   const [busyToken, setBusyToken] = useState(false);
   const [busyToggle, setBusyToggle] = useState(false);
   const [busyLabel, setBusyLabel] = useState(false);
@@ -72,17 +73,31 @@ export function AccountDetail({ accountId }: { accountId: string }) {
       : String(error)
     : null;
 
-  async function handleLive() {
-    setBusyLive(true);
+  async function handleRefresh() {
+    setBusyRefresh(true);
     setActionError(null);
     try {
-      const refreshed = await liveRefreshAccount(accountId);
+      await mutate();
+      void mutateMeta();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyRefresh(false);
+    }
+  }
+
+  async function handleForceUsagePull() {
+    if (usage?.status === "disabled") return;
+    setBusyPull(true);
+    setActionError(null);
+    try {
+      const refreshed = await forceUsagePull(accountId);
       await mutate(refreshed, { revalidate: false });
       void mutateMeta();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusyLive(false);
+      setBusyPull(false);
     }
   }
 
@@ -262,24 +277,28 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => void mutate()}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500"
+                  onClick={() => void handleRefresh()}
+                  disabled={busyRefresh || busyPull || busyToken}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Refresh cached
+                  {busyRefresh ? "Refreshing…" : "Refresh"}
                 </button>
                 <button
-                  onClick={() => void handleLive()}
-                  disabled={busyLive}
-                  className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
+                  onClick={() => void handleForceUsagePull()}
+                  disabled={
+                    busyRefresh ||
+                    busyPull ||
+                    busyToken ||
+                    usage.status === "disabled"
+                  }
+                  title={
+                    usage.status === "disabled"
+                      ? "Enable this account before pulling fresh usage."
+                      : undefined
+                  }
+                  className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {busyLive ? "Refreshing…" : "Live refresh"}
-                </button>
-                <button
-                  onClick={() => void handleToken()}
-                  disabled={busyToken}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-50"
-                >
-                  {busyToken ? "Refreshing…" : "Refresh token"}
+                  {busyPull ? "Pulling usage…" : "Force usage pull"}
                 </button>
               </div>
             </div>
@@ -315,7 +334,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               )}
               {!quota && (
                 <div className="rounded-md bg-zinc-950 p-3 text-sm text-zinc-500 ring-1 ring-zinc-800">
-                  No quota data yet. Run a live refresh to fetch it from upstream.
+                  No quota data yet. Force a usage pull to fetch it from Codex.
                 </div>
               )}
             </div>
@@ -397,6 +416,13 @@ export function AccountDetail({ accountId }: { accountId: string }) {
             <details className="mt-4 border-t border-zinc-800 pt-4">
               <summary className="cursor-pointer text-sm font-medium text-zinc-400 hover:text-zinc-200">Account controls</summary>
               <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                onClick={() => void handleToken()}
+                disabled={busyRefresh || busyPull || busyToken}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-50"
+              >
+                {busyToken ? "Refreshing…" : "Refresh authentication token"}
+              </button>
               <button
                 onClick={() => void handleToggle()}
                 disabled={busyToggle || toggleBlocked}
