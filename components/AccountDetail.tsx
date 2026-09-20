@@ -12,6 +12,7 @@ import { UsageBar } from "@/components/UsageBar";
 import {
   accountMetaKey,
   accountUsageKey,
+  manualUsageMode,
 } from "@/lib/cache-keys";
 import {
   deleteAccountById,
@@ -35,7 +36,6 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   const router = useRouter();
   const now = useNow();
   const [busyRefresh, setBusyRefresh] = useState(false);
-  const [busyPull, setBusyPull] = useState(false);
   const [busyToken, setBusyToken] = useState(false);
   const [busyToggle, setBusyToggle] = useState(false);
   const [busyLabel, setBusyLabel] = useState(false);
@@ -77,27 +77,18 @@ export function AccountDetail({ accountId }: { accountId: string }) {
     setBusyRefresh(true);
     setActionError(null);
     try {
-      await mutate();
+      const mode = manualUsageMode(usage?.status);
+      if (mode === "live") {
+        const refreshed = await forceUsagePull(accountId);
+        await mutate(refreshed, { revalidate: false });
+      } else {
+        await mutate();
+      }
       void mutateMeta();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyRefresh(false);
-    }
-  }
-
-  async function handleForceUsagePull() {
-    if (usage?.status === "disabled") return;
-    setBusyPull(true);
-    setActionError(null);
-    try {
-      const refreshed = await forceUsagePull(accountId);
-      await mutate(refreshed, { revalidate: false });
-      void mutateMeta();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusyPull(false);
     }
   }
 
@@ -278,27 +269,10 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => void handleRefresh()}
-                  disabled={busyRefresh || busyPull || busyToken}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busyRefresh ? "Refreshing…" : "Refresh"}
-                </button>
-                <button
-                  onClick={() => void handleForceUsagePull()}
-                  disabled={
-                    busyRefresh ||
-                    busyPull ||
-                    busyToken ||
-                    usage.status === "disabled"
-                  }
-                  title={
-                    usage.status === "disabled"
-                      ? "Enable this account before pulling fresh usage."
-                      : undefined
-                  }
+                  disabled={busyRefresh || busyToken}
                   className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {busyPull ? "Pulling usage…" : "Force usage pull"}
+                  {busyRefresh ? "Refreshing…" : "Refresh"}
                 </button>
               </div>
             </div>
@@ -334,7 +308,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               )}
               {!quota && (
                 <div className="rounded-md bg-zinc-950 p-3 text-sm text-zinc-500 ring-1 ring-zinc-800">
-                  No quota data yet. Force a usage pull to fetch it from Codex.
+                  No quota data yet. Refresh to fetch it from Codex.
                 </div>
               )}
             </div>
@@ -418,7 +392,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={() => void handleToken()}
-                disabled={busyRefresh || busyPull || busyToken}
+                disabled={busyRefresh || busyToken}
                 className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-200 ring-1 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-50"
               >
                 {busyToken ? "Refreshing…" : "Refresh authentication token"}

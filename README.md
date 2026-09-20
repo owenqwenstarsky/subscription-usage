@@ -185,6 +185,8 @@ The home page fetches cached account/quota data, proxy health, and rotation
 state independently.
 
 - Account data refreshes every 60 seconds and when the tab regains focus.
+- The explicit **Refresh** action pulls fresh upstream usage for every enabled
+  account and keeps cached values visible for disabled or failed accounts.
 - Proxy health and rotation refresh every 30 seconds.
 - The page schedules one extra cached refresh just after the nearest known
   cooldown, primary reset, or secondary reset, when it occurs within 24 hours.
@@ -215,7 +217,7 @@ order is stored under `usage-viewer:account-order:v1` in browser
 
 Open **Manage** on an account card to see the full account view. It supports:
 
-- Cached refresh and live quota pull
+- Fresh quota refresh for enabled accounts and cached refresh for disabled ones
 - OAuth token refresh
 - Label editing
 - Enable/disable for active or disabled accounts
@@ -224,8 +226,8 @@ Open **Manage** on an account card to see the full account view. It supports:
 - Credits, cooldown, last proxy error, OAuth expiry, quota source, quota fetch
   time, account IDs, and raw usage JSON
 
-Expired and banned accounts cannot be re-enabled from this UI. Live usage pull
-is disabled for an account whose status is `disabled`.
+Expired and banned accounts cannot be re-enabled from this UI. Refreshing a
+disabled account reads its cached usage without contacting ChatGPT upstream.
 
 ### Add account
 
@@ -279,17 +281,11 @@ web UI setting.
 
 ## Usage refresh behavior
 
-The two refresh actions intentionally do different work.
+Background polling requests `mode=cached`. It lists accounts and returns quota
+snapshots already stored by the proxy, so the 60-second poll and focus
+revalidation do not call the upstream ChatGPT usage endpoint.
 
-### Refresh
-
-**Refresh** requests `mode=cached` from this application's API. It lists
-accounts and returns the quota snapshots already stored by the proxy. It is
-fast and does not call the upstream ChatGPT usage endpoint.
-
-### Force usage pull
-
-**Force usage pull** requests `mode=live`. The server:
+The explicit **Refresh** action requests `mode=live`. The server:
 
 1. Lists all accounts.
 2. Skips accounts whose status is `disabled`, preserving their cached quota.
@@ -641,12 +637,12 @@ Then confirm `PROXY_BASE_URL`, DNS, container networking, firewall rules, and
 whether the URL should use the host's address rather than `localhost` from the
 UI process's network namespace.
 
-### Refresh works but force pull fails
+### Background data appears but Refresh fails
 
-Cached refresh only reads proxy storage. A live pull additionally needs valid
-account OAuth credentials and access to the upstream ChatGPT usage endpoint.
-Inspect the affected account's last error and the proxy logs. Other accounts
-may still update successfully.
+Background polling only reads proxy storage. The explicit Refresh action also
+needs valid account OAuth credentials and access to the upstream ChatGPT usage
+endpoint. Inspect the affected account's last error and the proxy logs. Other
+accounts may still update successfully.
 
 ### An account is not eligible even though it is active
 

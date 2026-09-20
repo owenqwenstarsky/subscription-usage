@@ -38,6 +38,7 @@ import {
 } from "@/lib/account-order";
 import {
   healthKey,
+  manualUsageMode,
   rotationKey,
   usageAllKey,
 } from "@/lib/cache-keys";
@@ -119,7 +120,6 @@ export function Dashboard() {
 
   // ---- Data: cached usage list (polls), health (polls slower), rotation (own key)
   const [refreshing, setRefreshing] = useState(false);
-  const [pullingUsage, setPullingUsage] = useState(false);
   const [pullError, setPullError] = useState<string | null>(null);
   const [pullErrorDetails, setPullErrorDetails] = useState<string | null>(null);
   const [rotationBusy, setRotationBusy] = useState(false);
@@ -145,11 +145,6 @@ export function Dashboard() {
         writeAccountOrder(next);
         return next;
       });
-      // A fresh cached poll supersedes any earlier forced-pull failure.
-      if (data.mode === "cached") {
-        setPullError(null);
-        setPullErrorDetails(null);
-      }
     },
   });
 
@@ -199,30 +194,19 @@ export function Dashboard() {
     writeAccountOrder(next);
   }
 
-  // ---- Force a fresh upstream usage pull for all non-disabled accounts.
-  async function handleForceUsagePull() {
-    setPullingUsage(true);
+  // ---- Explicit refresh pulls fresh upstream usage for all active accounts.
+  async function handleRefresh() {
+    setRefreshing(true);
     setPullError(null);
     setPullErrorDetails(null);
     try {
-      const data = await fetchJson<UsageAllResponse>(usageAllKey("live"));
+      const data = await fetchJson<UsageAllResponse>(
+        usageAllKey(manualUsageMode()),
+      );
       await mutateUsage(data, { revalidate: false });
     } catch (err) {
       setPullError(errorMessage(err));
       setPullErrorDetails(errorDetails(err));
-    } finally {
-      setPullingUsage(false);
-    }
-  }
-
-  async function handleCachedRefresh() {
-    setRefreshing(true);
-    try {
-      await mutateUsage();
-      setPullError(null);
-      setPullErrorDetails(null);
-    } catch {
-      // Failure surfaces via usageError banner.
     } finally {
       setRefreshing(false);
     }
@@ -412,18 +396,11 @@ export function Dashboard() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => void handleCachedRefresh()}
-              disabled={refreshing || pullingUsage}
-              className="rounded-xl border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </button>
-            <button
-              onClick={() => void handleForceUsagePull()}
-              disabled={refreshing || pullingUsage}
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
               className="rounded-xl bg-indigo-200 px-3.5 py-2 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {pullingUsage ? "Pulling usage…" : "Force usage pull"}
+              {refreshing ? "Refreshing…" : "Refresh"}
             </button>
             <button onClick={() => setShowAdd(true)} className="rounded-xl bg-teal-300 px-3.5 py-2 text-sm font-semibold text-teal-950 transition hover:bg-teal-200">Add account</button>
           </div>
@@ -453,11 +430,11 @@ export function Dashboard() {
         )}
         {pullError && (
           <ErrorBanner
-            title="Force usage pull failed"
+            title="Refresh failed"
             message={pullError}
             details={pullErrorDetails}
             hint="Your existing account data is still shown."
-            onRetry={() => void handleForceUsagePull()}
+            onRetry={() => void handleRefresh()}
             onDismiss={() => {
               setPullError(null);
               setPullErrorDetails(null);
@@ -466,11 +443,11 @@ export function Dashboard() {
         )}
         {usageErrorMessage && (
           <ErrorBanner
-            title="Refresh failed"
+            title="Background refresh failed"
             message={usageErrorMessage}
             details={errorDetails(usageError)}
             hint="Try again in a moment."
-            onRetry={() => void handleCachedRefresh()}
+            onRetry={() => void mutateUsage()}
           />
         )}
         {failures > 0 && (
