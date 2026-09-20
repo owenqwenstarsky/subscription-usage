@@ -9,6 +9,10 @@
 
 export type UsageMode = "cached" | "live";
 
+export function manualUsageMode(status?: string): UsageMode {
+  return status === "disabled" ? "cached" : "live";
+}
+
 export const healthKey = "/api/health";
 
 export const rotationKey = "/api/rotation";

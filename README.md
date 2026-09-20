@@ -35,25 +35,25 @@ Env vars (`web/.env.local`, server-only — never `NEXT_PUBLIC_`):
 
 ## Refreshing usage
 
-- **Refresh** reads the proxy's stored quota snapshots. It is fast and never
-  hits Codex upstream.
-- **Force usage pull** fans out to `GET /admin/accounts/:id/usage`, which
+- **Refresh** fans out to `GET /admin/accounts/:id/usage`, which
   fetches fresh quota from `chatgpt.com` and updates the proxy cache. Disabled
   accounts are skipped and retain their saved values. Other accounts can fail
   independently without hiding cached data.
+- Background polling reads the proxy's stored quota snapshots every 60 seconds
+  without hitting Codex upstream.
 
 ## Features
 
 - Usage dashboard: cached auto-poll every 60 seconds, focus revalidation,
-  explicit Refresh and Force usage pull actions, and a one-shot refetch when
+  explicit fresh usage refresh, and a one-shot cached refetch when
   the nearest cooldown/reset expires
 - Overview counts (clickable: eligible / exhausted / cooldown / disabled /
   errors) + token expired / expiring + max primary
 - Per-account primary (~5h), secondary (~weekly), and code-review (~daily) bars
   with reset countdowns
 - Credits, OAuth expiry, cooldown, last error, quota source/fetched-at
-- Per-account Refresh and Force usage pull actions, authentication-token
-  refresh under account controls, optimistic enable/disable + label edit with
+- Per-account fresh usage refresh, authentication-token refresh under account
+  controls, optimistic enable/disable + label edit with
   rollback, and delete with confirmation
 - Add account via device-login flow (auth URL + user code + status polling)
 - Rotation strategy switcher (optimistic, works even when health fails)
