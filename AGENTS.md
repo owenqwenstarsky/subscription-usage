@@ -8,6 +8,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+# Testing requirement
+
+Always add or update automated tests for every code change. Tests must cover the
+new or changed behavior and relevant failure or edge cases. Run the applicable
+test suite before finishing. If an automated test is genuinely impossible,
+state why and document the manual verification performed instead.
+
 # Repository boundary hard stop
 
 This repository is the `subscription-usage` web UI. The proxy/backend is a

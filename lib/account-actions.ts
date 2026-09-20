@@ -5,6 +5,7 @@
  */
 
 import { fetchJson } from "./fetch-json";
+import { accountUsageKey } from "./cache-keys";
 import {
   AccountMetaResponse,
   AdminAccount,
@@ -13,7 +14,7 @@ import {
 
 export async function forceUsagePull(accountId: string): Promise<SingleUsageResponse> {
   return fetchJson<SingleUsageResponse>(
-    `/api/accounts/${encodeURIComponent(accountId)}/usage?mode=live`,
+    accountUsageKey(accountId, "live"),
   );
 }
 
