@@ -27,6 +27,11 @@ export function isCoolingDown(account: AdminAccount, now = Date.now()): boolean 
   return !Number.isNaN(ms) && ms > now;
 }
 
+/** True for either a failed UI refresh or the proxy's most recent account error. */
+export function hasAccountError(item: UsageAllItem): boolean {
+  return Boolean(item.error || item.account.last_error);
+}
+
 export function primaryPercent(item: UsageAllItem): number | null {
   const quota = quotaOf(item);
   const value = quota?.rate_limit.used_percent;
@@ -63,7 +68,7 @@ export function summarize(items: UsageAllItem[], now = Date.now()): OverviewCoun
     if (isExhausted(item)) exhausted += 1;
     if (isCoolingDown(item.account, now)) cooldown += 1;
     if (item.account.status === "disabled") disabled += 1;
-    if (item.error) errors += 1;
+    if (hasAccountError(item)) errors += 1;
 
     const expiresMs = Date.parse(item.account.oauth_expires);
     if (!Number.isNaN(expiresMs)) {
