@@ -50,6 +50,7 @@ import {
   UsageAllResponse,
 } from "@/lib/types";
 import {
+  hasAccountError,
   isCoolingDown,
   isExhausted,
   quotaOf,
@@ -283,7 +284,7 @@ export function Dashboard() {
       if (item.account.eligible_now) c.eligible += 1;
       if (isExhausted(item)) c.exhausted += 1;
       if (isCoolingDown(item.account, now)) c.cooldown += 1;
-      if (item.error) c.error += 1;
+      if (hasAccountError(item)) c.error += 1;
       if (item.account.status === "disabled") c.disabled += 1;
     }
     return c;
@@ -303,7 +304,7 @@ export function Dashboard() {
           if (!isCoolingDown(item.account, now)) return false;
           break;
         case "error":
-          if (!item.error && !item.account.last_error) return false;
+          if (!hasAccountError(item)) return false;
           break;
         case "disabled":
           if (item.account.status !== "disabled") return false;

@@ -200,7 +200,9 @@ can contribute to more than one attention condition.
 
 Search examines label, email, local account ID, upstream account ID, user ID,
 plan, and last error. Filters cover eligibility, exhausted quota, cooldown,
-errors, and disabled accounts. Supported sorts are:
+errors, and disabled accounts. The **Errors** filter includes both a failed
+dashboard refresh for an account and the proxy's persisted `last_error`; its
+displayed count uses the same definition. Supported sorts are:
 
 - Custom browser-local order
 - Primary utilization, high to low

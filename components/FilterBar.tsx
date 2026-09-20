@@ -17,7 +17,7 @@ const FILTERS: { key: AccountFilter; label: string }[] = [
   { key: "eligible", label: "Ready" },
   { key: "exhausted", label: "Limit reached" },
   { key: "cooldown", label: "Cooldown" },
-  { key: "error", label: "Needs attention" },
+  { key: "error", label: "Errors" },
   { key: "disabled", label: "Disabled" },
 ];
 
