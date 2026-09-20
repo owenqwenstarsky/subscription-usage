@@ -15,6 +15,13 @@ new or changed behavior and relevant failure or edge cases. Run the applicable
 test suite before finishing. If an automated test is genuinely impossible,
 state why and document the manual verification performed instead.
 
+# Documentation maintenance
+
+Always update the documentation when a change affects behavior, configuration,
+routes or data contracts, setup, operations, security assumptions, or the
+developer workflow. Keep `README.md` and any relevant files under `docs/`
+accurate in the same change; do not leave documentation updates for later.
+
 # Repository boundary hard stop
 
 This repository is the `subscription-usage` web UI. The proxy/backend is a
