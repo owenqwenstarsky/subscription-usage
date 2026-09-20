@@ -35,8 +35,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Live mode: fan out to the proxy; one bad account must not fail the page.
+    // Disabled accounts cannot make an upstream usage request, so keep their
+    // cached values without treating them as failures.
     const settled = await Promise.allSettled(
       accounts.map(async (account): Promise<UsageAllItem> => {
+        if (account.status === "disabled") {
+          return {
+            account,
+            quota: account.cached_quota ?? null,
+            quotaSource: account.cached_quota?.source ?? "",
+            quotaFetchedAt: account.cached_quota?.fetched_at ?? null,
+          };
+        }
         const usage = await fetchAccountUsage(account.id, false);
         const quota = usage.quota_runtime ?? usage.cached_quota ?? null;
         return {

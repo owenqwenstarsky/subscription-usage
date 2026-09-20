@@ -11,10 +11,9 @@ import {
   SingleUsageResponse,
 } from "./types";
 
-export async function liveRefreshAccount(accountId: string): Promise<SingleUsageResponse> {
+export async function forceUsagePull(accountId: string): Promise<SingleUsageResponse> {
   return fetchJson<SingleUsageResponse>(
-    `/api/accounts/${encodeURIComponent(accountId)}/refresh-usage`,
-    { method: "POST" },
+    `/api/accounts/${encodeURIComponent(accountId)}/usage?mode=live`,
   );
 }
 

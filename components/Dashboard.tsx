@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -65,8 +65,6 @@ const FILTERS: AccountFilter[] = [
   "disabled",
 ];
 const SORTS: SortKey[] = ["custom", "primary-desc", "secondary-desc", "reset-soonest", "label"];
-const POLL_OPTIONS = [15_000, 30_000, 60_000, 300_000];
-
 function parseFilter(v: string | null): AccountFilter {
   return v !== null && FILTERS.includes(v as AccountFilter)
     ? (v as AccountFilter)
@@ -75,14 +73,6 @@ function parseFilter(v: string | null): AccountFilter {
 
 function parseSort(v: string | null): SortKey {
   return v !== null && SORTS.includes(v as SortKey) ? (v as SortKey) : "custom";
-}
-
-function readLS(key: string): string | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
 }
 
 function errorMessage(err: unknown): string {
@@ -116,24 +106,7 @@ export function Dashboard() {
   const [sort, setSort] = useState<SortKey>(() => parseSort(searchParams.get("sort")));
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [accountOrder, setAccountOrder] = useState<string[]>(readAccountOrder);
-  // Poll prefs persist locally (not in URL).
-  const [autoRefresh, setAutoRefresh] = useState(
-    () => readLS("usage-viewer:auto") !== "off",
-  );
-  const [pollMs, setPollMs] = useState(() => {
-    const v = Number(readLS("usage-viewer:poll"));
-    return POLL_OPTIONS.includes(v) ? v : 60_000;
-  });
   const [showAdd, setShowAdd] = useState(false);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("usage-viewer:auto", autoRefresh ? "on" : "off");
-      window.localStorage.setItem("usage-viewer:poll", String(pollMs));
-    } catch {
-      // Private mode etc. — prefs just won't persist.
-    }
-  }, [autoRefresh, pollMs]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -145,12 +118,12 @@ export function Dashboard() {
   }, [filter, sort, query, router, pathname]);
 
   // ---- Data: cached usage list (polls), health (polls slower), rotation (own key)
-  const [liveRefreshing, setLiveRefreshing] = useState(false);
-  const [liveError, setLiveError] = useState<string | null>(null);
-  const [liveDetails, setLiveDetails] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullingUsage, setPullingUsage] = useState(false);
+  const [pullError, setPullError] = useState<string | null>(null);
+  const [pullErrorDetails, setPullErrorDetails] = useState<string | null>(null);
   const [rotationBusy, setRotationBusy] = useState(false);
   const [rotationError, setRotationError] = useState<string | null>(null);
-  const liveAbort = useRef<AbortController | null>(null);
 
   const {
     data: usageData,
@@ -159,7 +132,7 @@ export function Dashboard() {
     isValidating: usageValidating,
     mutate: mutateUsage,
   } = useSWR<UsageAllResponse>(usageAllKey("cached"), fetcher, {
-    refreshInterval: autoRefresh ? pollMs : 0,
+    refreshInterval: 60_000,
     revalidateOnFocus: true,
     dedupingInterval: 5000,
     onSuccess: (data) => {
@@ -172,10 +145,10 @@ export function Dashboard() {
         writeAccountOrder(next);
         return next;
       });
-      // A fresh cached poll supersedes any earlier live-attempt failure.
+      // A fresh cached poll supersedes any earlier forced-pull failure.
       if (data.mode === "cached") {
-        setLiveError(null);
-        setLiveDetails(null);
+        setPullError(null);
+        setPullErrorDetails(null);
       }
     },
   });
@@ -226,42 +199,32 @@ export function Dashboard() {
     writeAccountOrder(next);
   }
 
-  // ---- Live refresh all (cancellable; per-account failures stay on cards)
-  async function handleLiveRefreshAll() {
-    liveAbort.current?.abort();
-    const ctrl = new AbortController();
-    liveAbort.current = ctrl;
-    setLiveRefreshing(true);
-    setLiveError(null);
-    setLiveDetails(null);
+  // ---- Force a fresh upstream usage pull for all non-disabled accounts.
+  async function handleForceUsagePull() {
+    setPullingUsage(true);
+    setPullError(null);
+    setPullErrorDetails(null);
     try {
-      const data = await fetchJson<UsageAllResponse>(usageAllKey("live"), {
-        signal: ctrl.signal,
-      });
+      const data = await fetchJson<UsageAllResponse>(usageAllKey("live"));
       await mutateUsage(data, { revalidate: false });
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setLiveError(errorMessage(err));
-      setLiveDetails(errorDetails(err));
+      setPullError(errorMessage(err));
+      setPullErrorDetails(errorDetails(err));
     } finally {
-      if (liveAbort.current === ctrl) {
-        liveAbort.current = null;
-        setLiveRefreshing(false);
-      }
+      setPullingUsage(false);
     }
   }
 
-  function cancelLiveRefresh() {
-    liveAbort.current?.abort();
-  }
-
   async function handleCachedRefresh() {
+    setRefreshing(true);
     try {
       await mutateUsage();
-      setLiveError(null);
-      setLiveDetails(null);
+      setPullError(null);
+      setPullErrorDetails(null);
     } catch {
       // Failure surfaces via usageError banner.
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -311,14 +274,14 @@ export function Dashboard() {
   }, [items, now]);
 
   useEffect(() => {
-    if (!autoRefresh || nextExpiry === null) return;
+    if (nextExpiry === null) return;
     const delay = nextExpiry - Date.now() + 1000;
     if (delay <= 0 || delay > 24 * 60 * 60 * 1000) return;
     const timer = setTimeout(() => {
       void mutateUsage();
     }, delay);
     return () => clearTimeout(timer);
-  }, [nextExpiry, autoRefresh, mutateUsage]);
+  }, [nextExpiry, mutateUsage]);
 
   // ---- Derived: counts, filter, sort
   const counts = useMemo(() => summarize(items, now), [items, now]);
@@ -420,7 +383,7 @@ export function Dashboard() {
     ? "bg-zinc-600"
     : proxyDown && items.length === 0
       ? "bg-red-500"
-      : proxyDown || stale || liveError
+      : proxyDown || stale || pullError
         ? "bg-amber-500"
         : "bg-emerald-500";
   const dotTitle = proxyDown && items.length === 0
@@ -444,29 +407,31 @@ export function Dashboard() {
               {usageValidating && usageData && <span className="text-xs text-zinc-500">Updating</span>}
             </div>
             <p className="mt-1.5 text-sm text-zinc-500">
-              {fetchedAt ? `${usageData?.mode === "live" ? "Live" : "Cached"} ${formatAgo(fetchedAt, now)}` : "Connecting to usage data"}
+              {fetchedAt ? `${usageData?.mode === "live" ? "Pulled" : "Cached"} ${formatAgo(fetchedAt, now)}` : "Connecting to usage data"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => void handleCachedRefresh()} className="rounded-xl border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800">Refresh</button>
-            {liveRefreshing ? (
-              <button onClick={cancelLiveRefresh} className="rounded-xl bg-amber-300 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-200">Cancel live update</button>
-            ) : (
-              <button onClick={() => void handleLiveRefreshAll()} className="rounded-xl bg-indigo-200 px-3.5 py-2 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-100">Live update</button>
-            )}
+            <button
+              onClick={() => void handleCachedRefresh()}
+              disabled={refreshing || pullingUsage}
+              className="rounded-xl border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+            <button
+              onClick={() => void handleForceUsagePull()}
+              disabled={refreshing || pullingUsage}
+              className="rounded-xl bg-indigo-200 px-3.5 py-2 text-sm font-semibold text-indigo-950 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pullingUsage ? "Pulling usage…" : "Force usage pull"}
+            </button>
             <button onClick={() => setShowAdd(true)} className="rounded-xl bg-teal-300 px-3.5 py-2 text-sm font-semibold text-teal-950 transition hover:bg-teal-200">Add account</button>
           </div>
         </div>
         <details className="mt-5 border-t border-zinc-800/90 pt-4">
-          <summary className="w-fit cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">Advanced refresh settings</summary>
-          <div className="mt-3 flex flex-col gap-3 rounded-xl bg-zinc-950/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <summary className="w-fit cursor-pointer text-xs font-medium text-zinc-500 transition hover:text-zinc-300">Routing settings</summary>
+          <div className="mt-3 rounded-xl bg-zinc-950/50 p-3">
             <RotationControl rotation={rotation} onChange={(strategy) => void handleRotationChange(strategy)} busy={rotationBusy} error={rotationError} />
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-zinc-400"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} className="accent-indigo-300" />Auto-refresh</label>
-              <select value={pollMs} onChange={(event) => setPollMs(Number(event.target.value))} disabled={!autoRefresh} className="rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-200 outline-none disabled:opacity-50" aria-label="Auto-refresh interval">
-                {POLL_OPTIONS.map((ms) => <option key={ms} value={ms}>{ms >= 60_000 ? `${ms / 60_000}m` : `${ms / 1000}s`}</option>)}
-              </select>
-            </div>
           </div>
         </details>
       </header>
@@ -486,16 +451,16 @@ export function Dashboard() {
             hint={items.length > 0 ? "Last saved account data may still be available." : "Try again when the service is available."}
           />
         )}
-        {liveError && (
+        {pullError && (
           <ErrorBanner
-            title="Live refresh failed"
-            message={liveError}
-            details={liveDetails}
+            title="Force usage pull failed"
+            message={pullError}
+            details={pullErrorDetails}
             hint="Your existing account data is still shown."
-            onRetry={() => void handleLiveRefreshAll()}
+            onRetry={() => void handleForceUsagePull()}
             onDismiss={() => {
-              setLiveError(null);
-              setLiveDetails(null);
+              setPullError(null);
+              setPullErrorDetails(null);
             }}
           />
         )}

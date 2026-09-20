@@ -33,27 +33,28 @@ Env vars (`web/.env.local`, server-only — never `NEXT_PUBLIC_`):
 | `PROXY_BASE_URL` | `http://localhost:8080` | Base URL of the running proxy            |
 | `PROXY_API_KEY`  | (required)              | Same key as the proxy's `PROXY_API_KEY`  |
 
-## Cached vs live
+## Refreshing usage
 
-- **Cached** (default, auto-poll): reads the proxy's stored quota snapshots.
-  Fast, never hits upstream.
-- **Live** (manual button): the server fans out to
-  `GET /admin/accounts/:id/usage` for every account, which fetches fresh
-  quota from `chatgpt.com`. Slow (seconds), can partially fail — per-account
-  errors stay on each card and cached data remains visible.
+- **Refresh** reads the proxy's stored quota snapshots. It is fast and never
+  hits Codex upstream.
+- **Force usage pull** fans out to `GET /admin/accounts/:id/usage`, which
+  fetches fresh quota from `chatgpt.com` and updates the proxy cache. Disabled
+  accounts are skipped and retain their saved values. Other accounts can fail
+  independently without hiding cached data.
 
 ## Features
 
-- Live dashboard: cached auto-poll (15s–5m, focus revalidate, updating
-  indicator), manual live refresh with cancel, one-shot refetch when the
-  nearest cooldown/reset expires
+- Usage dashboard: cached auto-poll every 60 seconds, focus revalidation,
+  explicit Refresh and Force usage pull actions, and a one-shot refetch when
+  the nearest cooldown/reset expires
 - Overview counts (clickable: eligible / exhausted / cooldown / disabled /
   errors) + token expired / expiring + max primary
 - Per-account primary (~5h), secondary (~weekly), and code-review (~daily) bars
   with reset countdowns
 - Credits, OAuth expiry, cooldown, last error, quota source/fetched-at
-- Per-card live refresh (patches the card, no full refetch), token refresh,
-  optimistic enable/disable + label edit with rollback, delete with confirm
+- Per-account Refresh and Force usage pull actions, authentication-token
+  refresh under account controls, optimistic enable/disable + label edit with
+  rollback, and delete with confirmation
 - Add account via device-login flow (auth URL + user code + status polling)
 - Rotation strategy switcher (optimistic, works even when health fails)
 - Filter / search / sort synced to the URL (`?filter&sort&q`), browser-local
@@ -69,7 +70,6 @@ Env vars (`web/.env.local`, server-only — never `NEXT_PUBLIC_`):
 - `DELETE /api/accounts/[id]`
 - `GET /api/accounts/usage-all?mode=cached|live`
 - `GET /api/accounts/[id]/usage?mode=cached|live`
-- `POST /api/accounts/[id]/refresh-usage`
 - `POST /api/accounts/[id]/refresh-token`
 - `PATCH /api/accounts/[id]` (`{label, status}`)
 - `POST /api/device-login/start`, `GET /api/device-login/[loginId]`
@@ -102,7 +102,7 @@ start day. Retain 30 daily files.
 ## Security note
 
 This site intentionally has no auth. Run it on localhost or a trusted
-network only — anyone with access can trigger live upstream refreshes and
+network only — anyone with access can trigger upstream usage pulls and
 enable/disable accounts. Do not expose it publicly.
 
 ## Verify

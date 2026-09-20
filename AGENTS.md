@@ -11,10 +11,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # Repository boundary hard stop
 
 This repository is the `subscription-usage` web UI. The proxy/backend is a
-separate project. If a request appears to require changing the proxy/backend,
-stop before proposing or performing that work and ask the user exactly:
+separate project. Read-only inspection of that project's documentation, source,
+and API contracts is allowed when it helps work in this repository and does not
+require confirmation. If a request appears to require proposing or performing
+changes in the proxy/backend repository, stop and ask the user exactly:
 
 > Hey — are you aware this is a separate fucking project?
 
-Continue across that repository boundary only after the user explicitly
-confirms they intend to work on the separate project.
+Continue with proxy/backend changes only after the user explicitly confirms they
+intend to work on the separate project.
