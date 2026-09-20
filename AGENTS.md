@@ -18,10 +18,12 @@ state why and document the manual verification performed instead.
 # Repository boundary hard stop
 
 This repository is the `subscription-usage` web UI. The proxy/backend is a
-separate project. Read-only inspection of that project's documentation, source,
-and API contracts is allowed when it helps work in this repository and does not
-require confirmation. If a request appears to require proposing or performing
-changes in the proxy/backend repository, stop and ask the user exactly:
+separate project at <https://github.com/owenqwenstarsky/chatgpt-codex-proxy>.
+Use the GitHub API to read that repository's `main` branch as the source of
+truth for proxy behavior, APIs, and implementation details. This read-only
+inspection does not require confirmation. If a request appears to require
+proposing or performing changes in the proxy/backend repository, stop and ask
+the user exactly:
 
 > Hey — are you aware this is a separate fucking project?
 
